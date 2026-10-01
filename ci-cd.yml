@@ -1,0 +1,65 @@
+name: 888 Digital Factory - CI/CD
+
+on:
+  push:
+    branches: ["main"]
+  pull_request:
+    branches: ["main"]
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: "pages"
+  cancel-in-progress: true
+
+jobs:
+  ci:
+    name: CI - Validate & Build
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Validate project files
+        run: |
+          test -f index.html
+          test -f style.css
+          test -f script.js
+          test -f assets/banner.jpg
+          echo "Project structure OK"
+
+      - name: Check JavaScript syntax
+        run: node --check script.js
+
+      - name: Build Docker image
+        run: docker build -t 888-digital-factory:${{ github.sha }} .
+
+  cd:
+    name: CD - Deploy GitHub Pages
+    needs: ci
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Pages
+        uses: actions/configure-pages@v5
+
+      - name: Upload website artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: .
+
+      - name: Deploy
+        id: deployment
+        uses: actions/deploy-pages@v4
